@@ -30,42 +30,50 @@
             // 使用你提供的 GitHub Personal Access Token
             const token = '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'; // 在GitHub上生成的Token
 
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
+            try {
+                const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                    }
+                });
+
+                const fileData = await response.json();
+                let content = data;
+                let sha = fileData.sha || null;
+
+                // 如果文件已经存在，先读取内容，然后添加新数据
+                if (sha) {
+                    content = atob(fileData.content) + content;
                 }
-            });
 
-            const fileData = await response.json();
-            let content = data;
-            let sha = fileData.sha || null;
+                // 提交到GitHub
+                const commitResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                    },
+                    body: JSON.stringify({
+                        message: '提交血压数据',
+                        content: btoa(content),
+                        sha: sha
+                    })
+                });
 
-            // 如果文件已经存在，先读取内容，然后添加新数据
-            if (sha) {
-                content = atob(fileData.content) + content;
-            }
+                const commitData = await commitResponse.json();
 
-            // 提交到GitHub
-            const commitResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                },
-                body: JSON.stringify({
-                    message: '提交血压数据',
-                    content: btoa(content),
-                    sha: sha
-                })
-            });
-
-            const commitData = await commitResponse.json();
-            if (commitData.commit) {
-                alert('数据提交成功！');
-            } else {
-                alert('提交数据时发生错误');
+                if (commitData.commit) {
+                    alert('数据提交成功！');
+                    loadPastRecords();  // 提交成功后加载最新记录
+                } else {
+                    alert('提交数据时发生错误');
+                    console.error('提交失败:', commitData);
+                }
+            } catch (error) {
+                console.error('请求错误:', error);
+                alert('发生网络错误，请稍后再试');
             }
         }
 
@@ -77,29 +85,37 @@
 
             const token = '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'; // 在GitHub上生成的Token
 
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
+            try {
+                const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                    }
+                });
+
+                const fileData = await response.json();
+                let records = [];
+                if (fileData.content) {
+                    const content = atob(fileData.content);
+                    records = content.split("\n\n").slice(0, 20); // 获取前20条记录
                 }
-            });
 
-            const fileData = await response.json();
-            let records = [];
-            if (fileData.content) {
-                const content = atob(fileData.content);
-                records = content.split("\n\n").slice(0, 20); // 获取前20条记录
+                const recordList = document.getElementById('record-list');
+                recordList.innerHTML = '';
+                records.forEach(record => {
+                    const li = document.createElement('li');
+                    li.textContent = record;
+                    recordList.appendChild(li);
+                });
+            } catch (error) {
+                console.error('加载记录时发生错误:', error);
+                alert('加载记录时发生错误，请稍后再试');
             }
-
-            const recordList = document.getElementById('record-list');
-            recordList.innerHTML = '';
-            records.forEach(record => {
-                const li = document.createElement('li');
-                li.textContent = record;
-                recordList.appendChild(li);
-            });
         }
+
+        // 页面加载时自动加载最近20条记录
+        window.onload = loadPastRecords;
     </script>
 </head>
 <body>
